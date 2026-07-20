@@ -1,0 +1,89 @@
+# Sistema de mantenimiento predictivo PHM en streaming — orquestación completa.
+# Levanta las cinco capas de la arquitectura con un solo comando:
+#   docker compose up --build
+#
+# Requisitos previos en el host (en esta misma carpeta):
+#   - ./modelos/  con los .joblib de la Fase 3 (xgb_flota_q0.25, features, config)
+#   - ./data/     con los ficheros .h5 de N-CMAPSS
+# El panel queda accesible en http://localhost:8501
+#
+# NOTA sobre la BD: predicciones.db vive en un VOLUMEN Docker con nombre ("salida"),
+# no en una carpeta de Windows montada. SQLite sobre un bind mount de Windows (WSL2)
+# es lento y sus bloqueos no son fiables, lo que colgaba el panel. Para sacar una
+# copia de la BD al host:  docker compose cp consumer:/app/salida/predicciones.db .
+
+services:
+
+  # --- Capa 2: Transporte (broker MQTT) ---
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: phm_mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Capa 3: Procesamiento e inferencia ---
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: phm_consumer
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - ./modelos:/app/modelos:ro          # modelos entrenados (solo lectura)
+      - salida:/app/salida                 # volumen Docker: aquí se escribe predicciones.db
+    command: >
+      python consumer.py
+      --broker mosquitto
+      --model modelos/xgb_flota_q0.25.joblib
+      --features modelos/features.joblib
+      --config modelos/config.joblib
+      --db salida/predicciones.db
+
+  # --- Capa 1: Ingesta ---
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: phm_producer
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - ./modelos:/app/modelos:ro
+      - ./data:/app/data:ro                # ficheros .h5 de N-CMAPSS
+    # espera breve para que el consumer se suscriba antes de emitir el primer vuelo
+    command: >
+      sh -c "sleep 8 && python producer.py
+      --broker mosquitto
+      --data-dir data
+      --subset DS02
+      --max-engines 3
+      --speed 200
+      --config modelos/config.joblib"
+
+  # --- Capa 5: Visualización (panel Streamlit) ---
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: phm_dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - DB_PATH=salida/predicciones.db
+    volumes:
+      - salida:/app/salida                 # lee la misma predicciones.db desde el volumen
+
+# La capa 4 (almacenamiento SQLite) es el fichero predicciones.db dentro del
+# volumen "salida", compartido entre consumer (escribe) y dashboard (lee).
+volumes:
+  salida:

@@ -1,0 +1,7 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install --no-cache-dir streamlit pandas
+COPY dashboard.py ./
+EXPOSE 8501
+# Streamlit debe escuchar en 0.0.0.0 para ser accesible desde fuera del contenedor
+CMD ["streamlit", "run", "dashboard.py", "--server.address=0.0.0.0", "--server.port=8501"]

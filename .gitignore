@@ -1,0 +1,18 @@
+# ─── Datos de N-CMAPSS (descárgalos de la NASA; no van al repo) ───
+*.h5
+docker/data/*.h5
+
+# ─── Artefactos de ejecución del streaming (se regeneran solos) ───
+docker/salida/*.db
+docker/salida/*.db-*
+*.db-shm
+*.db-wal
+
+# ─── Cachés de Python / Jupyter ───
+**/__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# ─── Sistema ───
+.DS_Store
+Thumbs.db

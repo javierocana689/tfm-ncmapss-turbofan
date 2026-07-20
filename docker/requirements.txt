@@ -1,0 +1,6 @@
+paho-mqtt>=2.0
+numpy
+h5py
+joblib
+scikit-learn
+xgboost>=2.0
