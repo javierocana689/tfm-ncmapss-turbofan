@@ -11,7 +11,7 @@ Sistema PHM (Prognostics and Health Management) completo sobre el dataset [NASA 
 | Prognosis (flota, 9 subconjuntos) | RMSE medio | **6,24 ciclos** |
 | Calibración conservadora (q0,25) | Sobreestimación | 52% → **36%** |
 | Diagnóstico (XGBoost, por familias) | Exactitud zona degradada | **56%** |
-| Streaming vs batch | Diferencia (202 vuelos) | **0,000000 ciclos** |
+| Streaming vs batch | Diferencia (202 vuelos) | **0 ciclos** |
 
 ## Orden de lectura de los notebooks
 
